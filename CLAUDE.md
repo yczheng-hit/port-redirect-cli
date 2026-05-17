@@ -13,15 +13,17 @@ port_redirect/
 ├── cli.py       # argparse CLI entry point + subcommand handlers
 ├── proxy.py     # asyncio TCP proxy engine (ProxyServer class)
 ├── daemon.py    # Double-fork daemonization + PID management
+├── diagnose.py  # Connectivity & latency diagnostics
 ├── config.py    # JSON state/config file read/write
 ├── __init__.py  # Version string
 └── __main__.py  # python -m port_redirect support
 ```
 
-- **proxy.py**: `ProxyServer` uses `asyncio.start_server` to listen on `0.0.0.0:<port>`. Each connection spawns two relay tasks (local→remote, remote→local) using `asyncio.wait(FIRST_COMPLETED)`. Connections to target have a 30s timeout.
+- **proxy.py**: `ProxyServer` uses `asyncio.start_server` to listen on `0.0.0.0:<port>`. Each connection spawns two relay tasks (local→remote, remote→local) using `asyncio.wait(FIRST_COMPLETED)`. Connections to target have a 30s timeout. Enables `TCP_NODELAY` on both sides of every connection to reduce latency.
 - **daemon.py**: Double-fork (`os.fork()` × 2) to detach from terminal. PID files in `~/.port_redirect/<name>.pid`. Logs to `~/.port_redirect/logs/<name>.log` with rotation (10MB × 3). Stop uses SIGTERM then SIGKILL if needed.
+- **diagnose.py**: DNS lookup timing, TCP handshake latency (3-sample avg), proxy RTT measurement, Tailscale connection path detection (direct vs DERP relay), and high-latency root-cause analysis.
 - **config.py**: State persisted in `~/.port_redirect/state.json` (running proxies with PID/status). Config file for batch start in `~/.port_redirect/config.json`. Atomic writes via `.tmp` + replace.
-- **cli.py**: Subcommands — start, stop, list, restart, logs, apply.
+- **cli.py**: Subcommands — start, stop, list, restart, logs, apply, diagnose.
 
 ## CLI Commands
 
@@ -44,6 +46,9 @@ port-redirect logs <name> [--tail N]
 
 # Batch start from JSON config
 port-redirect apply [--config path/to/config.json] [--daemon]
+
+# Diagnose a proxy
+port-redirect diagnose <name> [--tail N]
 ```
 
 ## Config File Format (~/.port_redirect/config.json)
