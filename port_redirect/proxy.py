@@ -2,8 +2,19 @@
 
 import asyncio
 import logging
+import socket
 
 logger = logging.getLogger("port-redirect.proxy")
+
+
+def _set_nodelay(writer):
+    """Enable TCP_NODELAY on a connection to reduce latency."""
+    try:
+        sock = writer.transport.get_extra_info("socket")
+        if sock is not None:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except (OSError, AttributeError, TypeError):
+        pass
 
 
 class ProxyServer:
@@ -50,6 +61,9 @@ class ProxyServer:
 
         peername = local_writer.get_extra_info("peername")
         logger.info("Proxy connection %s -> %s:%s", peername, self.target_host, self.target_port)
+
+        _set_nodelay(local_writer)
+        _set_nodelay(remote_writer)
 
         task_a = asyncio.create_task(self._relay(local_reader, remote_writer, "L->R"))
         task_b = asyncio.create_task(self._relay(remote_reader, local_writer, "R->L"))

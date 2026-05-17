@@ -12,6 +12,7 @@ from port_redirect import __version__
 from port_redirect.config import list_proxies, get_proxy, add_proxy, remove_proxy, update_status, load_config, validate_config_entry
 from port_redirect.proxy import ProxyServer
 from port_redirect.daemon import daemonize, write_pid, read_pid, remove_pid, stop_daemon, is_running, setup_logger
+from port_redirect.diagnose import diagnose_proxy
 
 
 def cmd_start(args: argparse.Namespace):
@@ -237,6 +238,12 @@ def cmd_apply(args: argparse.Namespace):
         sys.exit(1)
 
 
+def cmd_diagnose(args: argparse.Namespace):
+    """Run diagnostics on a proxy."""
+    report = diagnose_proxy(args.name)
+    print(report)
+
+
 def cmd_logs(args: argparse.Namespace):
     """Show logs for a proxy."""
     name = args.name
@@ -295,6 +302,10 @@ def build_parser() -> argparse.ArgumentParser:
                          help="Path to JSON config file (default: ~/.port_redirect/config.json)")
     p_apply.add_argument("--daemon", "-d", action="store_true", help="Run all in background")
 
+    # diagnose
+    p_diag = sub.add_parser("diagnose", help="Run connectivity and latency diagnostics on a proxy")
+    p_diag.add_argument("name", help="Name of the proxy to diagnose")
+
     return parser
 
 
@@ -315,6 +326,8 @@ def main():
         cmd_logs(args)
     elif args.command == "apply":
         cmd_apply(args)
+    elif args.command == "diagnose":
+        cmd_diagnose(args)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,8 @@
 - **前台/后台运行** — 支持 `--daemon` 后台守护进程模式，关闭终端后持续运行
 - **进程管理** — 查看、停止、重启已启动的转发服务
 - **JSON 配置文件** — 支持从配置文件批量启动多个转发
+- **连接诊断** — 内置延迟、连通性诊断工具，快速定位网络问题
+- **延迟优化** — TCP_NODELAY 禁用 Nagle 算法，减少小数据包延迟
 - **日志管理** — 自动日志记录，支持日志轮转
 - **零依赖** — 纯 Python 3.8+ 标准库实现
 
@@ -100,6 +102,50 @@ port-redirect apply --config /path/to/config.json --daemon
 | `restart <name>` | 重启转发服务 |
 | `logs <name>` | 查看转发日志 |
 | `apply` | 从 JSON 配置文件批量启动 |
+| `diagnose <name>` | 诊断连接延迟和连通性 |
+
+### start 参数
+
+| 参数 | 说明 |
+|------|------|
+| `listen_port` | 本地监听端口 |
+| `target_host` | 目标主机 IP 或域名 |
+| `target_port` | 目标端口 |
+| `--name, -n` | 转发服务名称（默认: proxy-<端口>） |
+| `--daemon, -d` | 后台运行模式 |
+| `--log-level` | 日志级别: DEBUG/INFO/WARNING/ERROR |
+
+## 连接诊断
+
+使用 `diagnose` 命令排查代理的连接性和延迟问题：
+
+```bash
+port-redirect diagnose tunnel-ssh
+```
+
+输出示例：
+
+```
+Diagnosing proxy 'tunnel-ssh': 0.0.0.0:20001 -> 10.0.0.1:2222
+
+  DNS resolution:    10.0.0.1 (1.2ms)
+  Target TCP connect: 82.7ms avg (82.0-83.6ms, 3 samples)
+  Proxy TCP connect:  0.5ms avg (0.4-0.8ms, 3 samples)
+  RTT via proxy:      168.1ms avg (163.9-175.2ms, 3 samples)
+  Tailscale:          direct connection
+                      active; direct 10.0.0.1:47972
+
+  ✓  Latency looks good (82.7ms to target)
+```
+
+诊断内容包括：
+- **DNS 解析** — 目标域名解析耗时
+- **目标 TCP 连接** — 直接连接到目标地址的握手延迟（3 次采样取平均）
+- **代理 TCP 连接** — 通过本地代理端口的连接延迟
+- **RTT 往返** — 通过代理发送数据并接收响应的完整往返时间
+- **Tailscale 状态** — 连接路径（直连/relay）、延迟分析
+
+当检测到高延迟时，会给出可能的原因和优化建议。
 
 ### start 参数
 
@@ -160,8 +206,9 @@ port-redirect stop web-proxy
 ```
 port_redirect/
 ├── cli.py       # 命令行入口 + 子命令处理
-├── proxy.py     # asyncio TCP 代理引擎
+├── proxy.py     # asyncio TCP 代理引擎（含 TCP_NODELAY 优化）
 ├── daemon.py    # 后台进程管理（双 fork）
+├── diagnose.py  # 连接诊断和延迟检测
 ├── config.py    # JSON 状态/配置读写
 ├── __init__.py  # 版本信息
 └── __main__.py  # python -m 入口
